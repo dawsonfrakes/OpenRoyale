@@ -26,6 +26,23 @@ void clear_held_keys() {
 
 void toggle_fullscreen() {
 	static WINDOWPLACEMENT save_placement = {size_of(WINDOWPLACEMENT)};
+
+	u32 style = cast(u32) GetWindowLongPtrW(platform_hwnd, GWL_STYLE);
+	if (style & WS_OVERLAPPEDWINDOW) {
+		MONITORINFO mi = {size_of(MONITORINFO)};
+		GetMonitorInfoW(MonitorFromWindow(platform_hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+
+		GetWindowPlacement(platform_hwnd, &save_placement);
+		SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style & ~cast(u32) WS_OVERLAPPEDWINDOW);
+		SetWindowPos(platform_hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_FRAMECHANGED);
+	} else {
+		SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style | cast(u32) WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(platform_hwnd, &save_placement);
+		SetWindowPos(platform_hwnd, null, 0, 0, 0, 0, SWP_NOMOVE |
+			SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	}
 }
 
 s64 WINAPI window_proc(HWND hwnd, u32 message, u64 wParam, s64 lParam) {
@@ -158,3 +175,5 @@ main_loop_end:
 
 	ExitProcess(0);
 }
+
+extern "C" int _fltused = 0;

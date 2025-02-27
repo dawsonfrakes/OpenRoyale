@@ -1,11 +1,11 @@
 #define RENDER_API_NONE 0
-#define RENDER_API_D3D12 1
+#define RENDER_API_D3D11 1
 
-#define RENDER_API RENDER_API_D3D12
+#define RENDER_API RENDER_API_D3D11
 
-#if RENDER_API == RENDER_API_D3D12
-#include "renderer_d3d12.cpp"
-#define RENDER_API_NAME d3d12
+#if RENDER_API == RENDER_API_D3D11
+#include "renderer_d3d11.cpp"
+#define RENDER_API_NAME d3d11
 #endif
 
 #define renderer_cat2(A, B) A ## B
