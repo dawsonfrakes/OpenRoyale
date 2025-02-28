@@ -1,5 +1,6 @@
 #define cast(T) (T)
 #define size_of(T) (cast(s64) sizeof(T))
+#define offset_of(T, F) (cast(s64) &(cast(T*) 0)->F)
 #define null nullptr
 
 typedef signed char s8;
