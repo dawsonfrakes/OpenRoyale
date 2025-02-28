@@ -7,6 +7,7 @@ platform_hinstance: w.HINSTANCE
 platform_hwnd: w.HWND
 platform_hdc: w.HDC
 platform_size: [2]u16
+platform_clock: f32
 
 main :: proc() {
 	update_cursor_clip :: proc() {
@@ -138,7 +139,10 @@ main :: proc() {
 		}
 		clock_current: w.LARGE_INTEGER = ---
 		w.QueryPerformanceCounter(&clock_current)
+		delta := f32(clock_current - clock_previous) / f32(clock_frequency)
 		defer clock_previous = clock_current
+
+		platform_clock += delta
 
 		renderer.present()
 

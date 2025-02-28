@@ -1,6 +1,7 @@
 #+build windows
 package platform
 
+import "core:math/linalg"
 import w "core:sys/windows"
 import "vendor:directx/d3d11"
 import "vendor:directx/dxgi"
@@ -10,10 +11,23 @@ Vertex :: struct {
 	position: [3]f32,
 	color: [3]f32,
 }
+indices := []u16{
+	0,2,1, 2,3,1,
+	1,3,5, 3,7,5,
+	2,6,3, 3,6,7,
+	4,5,7, 4,7,6,
+	0,4,2, 2,4,6,
+	0,1,4, 1,5,4,
+}
 vertices := []Vertex{
-	{position = {-0.5, -0.5, 0.0}, color = {1.0, 0.0, 0.0}},
-	{position = {+0.0, +0.5, 0.0}, color = {0.0, 1.0, 0.0}},
-	{position = {+0.5, -0.5, 0.0}, color = {0.0, 0.0, 1.0}},
+	{position = {-1.0, -1.0, -1.0}, color = {1.0, 0.0, 0.0}},
+	{position = {+1.0, -1.0, -1.0}, color = {0.0, 1.0, 0.0}},
+	{position = {-1.0, +1.0, -1.0}, color = {0.0, 0.0, 1.0}},
+	{position = {+1.0, +1.0, -1.0}, color = {1.0, 1.0, 0.0}},
+	{position = {-1.0, -1.0, +1.0}, color = {1.0, 0.0, 1.0}},
+	{position = {+1.0, -1.0, +1.0}, color = {0.0, 1.0, 1.0}},
+	{position = {-1.0, +1.0, +1.0}, color = {0.0, 0.0, 0.0}},
+	{position = {+1.0, +1.0, +1.0}, color = {1.0, 1.0, 1.0}},
 }
 
 d3dobj : struct {
@@ -74,16 +88,57 @@ d3d11_present :: proc() {
 	d3dobj.ctx->RSSetViewports(1, &d3d11.VIEWPORT{Width = f32(platform_size.x), Height = f32(platform_size.y), MaxDepth = 1.0})
 
 	vertex_buffer: ^d3d11.IBuffer
-	vbd: d3d11.BUFFER_DESC
-	vbd.ByteWidth = u32(len(vertices) * size_of(Vertex))
-	vbd.Usage = .DEFAULT
-	vbd.BindFlags = {.VERTEX_BUFFER}
-	vbd.StructureByteStride = size_of(Vertex)
-	vsr: d3d11.SUBRESOURCE_DATA
-	vsr.pSysMem = raw_data(vertices)
-	hr = d3dobj.device->CreateBuffer(&vbd, &vsr, &vertex_buffer)
-	if w.FAILED(hr) { d3d11_deinit(); return }
+	{
+		vbd: d3d11.BUFFER_DESC
+		vbd.ByteWidth = u32(len(vertices) * size_of(Vertex))
+		vbd.Usage = .DEFAULT
+		vbd.BindFlags = {.VERTEX_BUFFER}
+		vbd.StructureByteStride = size_of(Vertex)
+		vsr: d3d11.SUBRESOURCE_DATA
+		vsr.pSysMem = raw_data(vertices)
+		hr = d3dobj.device->CreateBuffer(&vbd, &vsr, &vertex_buffer)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
 	defer vertex_buffer->Release()
+
+	index_buffer: ^d3d11.IBuffer
+	{
+		vbd: d3d11.BUFFER_DESC
+		vbd.ByteWidth = u32(len(indices) * size_of(u16))
+		vbd.Usage = .DEFAULT
+		vbd.BindFlags = {.INDEX_BUFFER}
+		vbd.StructureByteStride = size_of(u16)
+		vsr: d3d11.SUBRESOURCE_DATA
+		vsr.pSysMem = raw_data(indices)
+		hr = d3dobj.device->CreateBuffer(&vbd, &vsr, &index_buffer)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+	defer index_buffer->Release()
+
+	constant_buffer: ^d3d11.IBuffer
+	{
+		ConstantBuffer :: struct {
+			transform: matrix[4, 4]f32,
+		}
+
+		cb := ConstantBuffer{
+			transform = linalg.transpose(
+				linalg.matrix4_infinite_perspective_f32(linalg.to_radians(f32(90.0)), f32(platform_size.x) / f32(platform_size.y), 0.1, flip_z_axis = false) *
+				linalg.matrix4_translate_f32({linalg.sin(platform_clock) * 2, linalg.cos(platform_clock) * 2, 3.0})
+			),
+		}
+
+		vbd: d3d11.BUFFER_DESC
+		vbd.ByteWidth = size_of(ConstantBuffer)
+		vbd.Usage = .DYNAMIC
+		vbd.BindFlags = {.CONSTANT_BUFFER}
+		vbd.CPUAccessFlags = {.WRITE}
+		vsr: d3d11.SUBRESOURCE_DATA
+		vsr.pSysMem = &cb
+		hr = d3dobj.device->CreateBuffer(&vbd, &vsr, &constant_buffer)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+	defer constant_buffer->Release()
 
 	vsrc := `
 	struct VSOut {
@@ -91,9 +146,13 @@ d3d11_present :: proc() {
 		float4 pos : SV_Position;
 	};
 
+	cbuffer CBuf {
+		matrix transform;
+	};
+
 	VSOut main(float3 pos : Position, float3 color : Color) {
 		VSOut vso;
-		vso.pos = float4(pos, 1.0);
+		vso.pos = mul(float4(pos, 1.0), transform);
 		vso.color = color;
 		return vso;
 	}
@@ -136,10 +195,12 @@ d3d11_present :: proc() {
 	d3dobj.ctx->PSSetShader(pixel_shader, nil, 0)
 	vertices_stride: u32 = size_of(Vertex)
 	vertices_offset: u32 = 0
+	d3dobj.ctx->VSSetConstantBuffers(0, 1, &constant_buffer)
 	d3dobj.ctx->IASetInputLayout(il)
 	d3dobj.ctx->IASetVertexBuffers(0, 1, &vertex_buffer, &vertices_stride, &vertices_offset)
+	d3dobj.ctx->IASetIndexBuffer(index_buffer, .R16_UINT, 0)
 	d3dobj.ctx->IASetPrimitiveTopology(.TRIANGLELIST)
-	d3dobj.ctx->Draw(u32(len(vertices)), 0)
+	d3dobj.ctx->DrawIndexed(u32(len(indices)), 0, 0)
 
 	d3dobj.swapchain->Present(1, {})
 }
