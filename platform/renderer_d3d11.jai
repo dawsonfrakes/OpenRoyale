@@ -80,7 +80,7 @@ d3d11_resize :: () {
 	if d3d11.depth_stencil_state IUnknown_Release(d3d11.depth_stencil_state);
 	d3d11.depth_stencil_state = null;
 
-	IDXGISwapChain_ResizeBuffers(d3d11.swapchain, 0, 0, 0, 0, xx DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
+	check(IDXGISwapChain_ResizeBuffers(d3d11.swapchain, 0, 0, 0, 0, xx DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH));
 
 	backbuffer: *ID3D11Texture2D;
 	check(IDXGISwapChain_GetBuffer(d3d11.swapchain, 0, *uid(ID3D11Texture2D_UUID), xx *backbuffer));
@@ -118,7 +118,7 @@ d3d11_present :: () {
 	ID3D11DeviceContext_OMSetRenderTargets(d3d11.ctx, 1, *d3d11.backbuffer_view, d3d11.depthbuffer_view);
 	ID3D11DeviceContext_OMSetDepthStencilState(d3d11.ctx, d3d11.depth_stencil_state, 0);
 
-	IDXGISwapChain_Present(d3d11.swapchain, 1, 0);
+	check(IDXGISwapChain_Present(d3d11.swapchain, 1, 0));
 }
 
 d3d11_clear_color :: (color: [4]float32, index := 0) {
