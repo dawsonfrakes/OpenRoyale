@@ -1,5 +1,7 @@
 #import "Basic";
 
+#load "../game/main.jai";
+
 #if true {
 	#load "renderer_d3d11.jai";
 	renderer :: d3d11_renderer;
@@ -170,6 +172,10 @@ main :: () {
 		clock_current: s64;
 		QueryPerformanceCounter(*clock_current);
 		defer clock_previous = clock_current;
+
+		game_renderer: Game_Renderer;
+		game_renderer.procs = renderer.procs;
+		game_update_and_render(*game_renderer);
 
 		renderer.present();
 
