@@ -1,10 +1,9 @@
 #define RENDER_API_NONE 0
-#define RENDER_API_D3D11 1
-#define RENDER_API_OPENGL 2
+#define RENDER_API_SOFTWARE 1
 
-#if RENDER_API == RENDER_API_D3D11
-#include "renderer_d3d11.cpp"
-#define RENDER_API_NAME d3d11
+#if RENDER_API == RENDER_API_SOFTWARE
+#include "renderer_software.cpp"
+#define RENDER_API_NAME swr
 #elif RENDER_API == RENDER_API_NONE
 void none_init() {}
 void none_deinit() {}

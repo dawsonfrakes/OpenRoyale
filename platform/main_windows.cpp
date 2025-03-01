@@ -14,9 +14,8 @@ HWND platform_hwnd;
 HDC platform_hdc;
 u16 platform_width;
 u16 platform_height;
-bool platform_exclusive_fullscreen = true; // :todo get this from game settings
 
-#define RENDER_API RENDER_API_D3D11
+#define RENDER_API RENDER_API_SOFTWARE
 #include "renderer.cpp"
 
 void update_cursor_clip() {
@@ -40,11 +39,7 @@ void toggle_fullscreen() {
 		SetWindowPos(platform_hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
 			mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top,
 			SWP_FRAMECHANGED);
-
-		renderer_fullscreen(true);
 	} else {
-		renderer_fullscreen(false);
-
 		SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style | cast(u32) WS_OVERLAPPEDWINDOW);
 		SetWindowPlacement(platform_hwnd, &save_placement);
 		SetWindowPos(platform_hwnd, null, 0, 0, 0, 0, SWP_NOMOVE |
