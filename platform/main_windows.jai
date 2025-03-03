@@ -1,4 +1,5 @@
-#import "Basic";
+#import "Basically";
+#import "Winblows";
 
 #load "../game/main.jai";
 
@@ -6,35 +7,6 @@
 	#load "renderer_d3d11.jai";
 	renderer :: d3d11_renderer;
 }
-
-ascii_to_utf16lez :: (s: string) -> []u16 {
-	utf16le: [..]u16;
-	array_reserve(*utf16le, s.count + 1);
-	for s array_add(*utf16le, it);
-	array_add(*utf16le, 0);
-	return utf16le;
-}
-
-#import "Windows";
-using,only(WSADATA,WSAStartup,WSACleanup) Socket :: #import "Socket";
-user32 :: #library,system "user32";
-IDI_WARNING :: cast(*void) 32515;
-WINDOWPLACEMENT :: struct {
-  length: u32;
-  flags: u32;
-  showCmd: u32;
-  ptMinPosition: POINT;
-  ptMaxPosition: POINT;
-  rcNormalPosition: RECT;
-  rcDevice: RECT;
-}
-GetWindowPlacement :: (hwnd: HWND, placement: *WINDOWPLACEMENT) -> s32 #foreign user32;
-SetWindowPlacement :: (hwnd: HWND, placement: *WINDOWPLACEMENT) -> s32 #foreign user32;
-dwmapi :: #library,system "dwmapi";
-DWMWA_USE_IMMERSIVE_DARK_MODE :: 20;
-DWMWA_WINDOW_CORNER_PREFERENCE :: 33;
-DWMWCP_DONOTROUND :: 1;
-DwmSetWindowAttribute :: (hwnd: HWND, attribute: u32, value: *void, size: u32) -> s32 #foreign dwmapi;
 
 platform_hinstance: HINSTANCE;
 platform_hwnd: HWND;
