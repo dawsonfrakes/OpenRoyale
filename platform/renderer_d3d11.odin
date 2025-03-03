@@ -4,16 +4,49 @@ package platform
 import w "core:sys/windows"
 import "vendor:directx/d3d11"
 import "vendor:directx/dxgi"
+import "vendor:directx/d3d_compiler"
+
+Rect_Index :: u16
+Rect_Vertex :: struct {
+	position: [2]f32,
+}
+Rect_Instance :: struct #align(16) {
+	offset: [3]f32,
+	scale: [2]f32,
+	color: [4]f32,
+	texcoords: [2][2]f32,
+	rotation: f32,
+	texture_index: u32,
+}
+
+rect_indices := []Rect_Index{0, 1, 2, 2, 3, 0}
+rect_vertices := []Rect_Vertex{
+	{position = {-0.5, -0.5}},
+	{position = {-0.5, +0.5}},
+	{position = {+0.5, +0.5}},
+	{position = {+0.5, -0.5}},
+}
+rect_instances := []Rect_Instance{
+	{offset = 0.0, scale = 1.0, color = 1.0, texcoords = {0.0, 1.0}, rotation = 0.0, texture_index = 0},
+}
 
 d3dobj : struct {
 	swapchain: ^dxgi.ISwapChain,
 	device: ^d3d11.IDevice,
 	ctx: ^d3d11.IDeviceContext,
+
 	swapchain_backbuffer: ^d3d11.ITexture2D,
 	backbuffer: ^d3d11.ITexture2D,
 	backbuffer_view: ^d3d11.IRenderTargetView,
 	depthbuffer_view: ^d3d11.IDepthStencilView,
 	depth_state: ^d3d11.IDepthStencilState,
+
+	rect_index_buffer: ^d3d11.IBuffer,
+	rect_vertex_buffer: ^d3d11.IBuffer,
+	rect_instance_buffer: ^d3d11.IBuffer,
+	rect_input_layout: ^d3d11.IInputLayout,
+	rect_vertex_shader: ^d3d11.IVertexShader,
+	rect_pixel_shader: ^d3d11.IPixelShader,
 }
 
 d3d11_init :: proc() {
@@ -51,7 +84,80 @@ d3d11_init :: proc() {
 		desc.DepthEnable = true
 		desc.DepthWriteMask = .ALL
 		desc.DepthFunc = .GREATER_EQUAL
-		d3dobj.device->CreateDepthStencilState(&desc, &d3dobj.depth_state)
+		hr = d3dobj.device->CreateDepthStencilState(&desc, &d3dobj.depth_state)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+
+	{
+		desc: d3d11.BUFFER_DESC
+		desc.ByteWidth = u32(len(rect_indices) * size_of(Rect_Index))
+		desc.Usage = .DEFAULT
+		desc.BindFlags = {.INDEX_BUFFER}
+		desc.StructureByteStride = size_of(Rect_Index)
+		sr: d3d11.SUBRESOURCE_DATA
+		sr.pSysMem = raw_data(rect_indices)
+		hr = d3dobj.device->CreateBuffer(&desc, &sr, &d3dobj.rect_index_buffer)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+
+	{
+		desc: d3d11.BUFFER_DESC
+		desc.ByteWidth = u32(len(rect_vertices) * size_of(Rect_Vertex))
+		desc.Usage = .DEFAULT
+		desc.BindFlags = {.VERTEX_BUFFER}
+		desc.StructureByteStride = size_of(Rect_Vertex)
+		sr: d3d11.SUBRESOURCE_DATA
+		sr.pSysMem = raw_data(rect_vertices)
+		hr = d3dobj.device->CreateBuffer(&desc, &sr, &d3dobj.rect_vertex_buffer)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+
+	{
+		desc: d3d11.BUFFER_DESC
+		desc.ByteWidth = u32(len(rect_instances) * size_of(Rect_Instance))
+		desc.Usage = .DEFAULT
+		desc.BindFlags = {.VERTEX_BUFFER}
+		desc.StructureByteStride = size_of(Rect_Instance)
+		sr: d3d11.SUBRESOURCE_DATA
+		sr.pSysMem = raw_data(rect_instances)
+		hr = d3dobj.device->CreateBuffer(&desc, &sr, &d3dobj.rect_instance_buffer)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+
+	{
+		src := `
+		float4 main(float2 position : POSITION) : SV_Position {
+			return float4(position, 0.0, 1.0);
+		}
+		`
+		blob: ^d3d11.IBlob
+		hr = d3d_compiler.Compile(raw_data(src), len(src), nil, nil, nil, "main", "vs_5_0", 0, 0, &blob, nil)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+		defer blob->Release()
+
+		hr = d3dobj.device->CreateVertexShader(blob->GetBufferPointer(), blob->GetBufferSize(), nil, &d3dobj.rect_vertex_shader)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+
+		descs := []d3d11.INPUT_ELEMENT_DESC{
+			{SemanticName = "POSITION", SemanticIndex = 0, Format = .R32G32_FLOAT, InputSlot = 0, AlignedByteOffset = u32(offset_of(Rect_Vertex, position)), InputSlotClass = .VERTEX_DATA, InstanceDataStepRate = 0},
+		}
+		hr = d3dobj.device->CreateInputLayout(raw_data(descs), u32(len(descs)), blob->GetBufferPointer(), blob->GetBufferSize(), &d3dobj.rect_input_layout)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+	}
+
+	{
+		src := `
+		float4 main() : SV_Target {
+			return float4(1.0, 1.0, 0.0, 1.0);
+		}
+		`
+		blob: ^d3d11.IBlob
+		hr = d3d_compiler.Compile(raw_data(src), len(src), nil, nil, nil, "main", "ps_5_0", 0, 0, &blob, nil)
+		if w.FAILED(hr) { d3d11_deinit(); return }
+		defer blob->Release()
+
+		hr = d3dobj.device->CreatePixelShader(blob->GetBufferPointer(), blob->GetBufferSize(), nil, &d3dobj.rect_pixel_shader)
+		if w.FAILED(hr) { d3d11_deinit(); return }
 	}
 }
 
@@ -64,6 +170,12 @@ d3d11_deinit :: proc() {
 	if d3dobj.backbuffer_view != nil do d3dobj.backbuffer_view->Release()
 	if d3dobj.depthbuffer_view != nil do d3dobj.depthbuffer_view->Release()
 	if d3dobj.depth_state != nil do d3dobj.depth_state->Release()
+	if d3dobj.rect_index_buffer != nil do d3dobj.rect_index_buffer->Release()
+	if d3dobj.rect_vertex_buffer != nil do d3dobj.rect_vertex_buffer->Release()
+	if d3dobj.rect_instance_buffer != nil do d3dobj.rect_instance_buffer->Release()
+	if d3dobj.rect_input_layout != nil do d3dobj.rect_input_layout->Release()
+	if d3dobj.rect_vertex_shader != nil do d3dobj.rect_vertex_shader->Release()
+	if d3dobj.rect_pixel_shader != nil do d3dobj.rect_pixel_shader->Release()
 	d3dobj = {}
 }
 
@@ -127,6 +239,23 @@ d3d11_present :: proc() {
 
 	d3dobj.ctx->OMSetDepthStencilState(d3dobj.depth_state, 0)
 	d3dobj.ctx->OMSetRenderTargets(1, &d3dobj.backbuffer_view, d3dobj.depthbuffer_view)
+
+	vertex_buffers := [](^d3d11.IBuffer){d3dobj.rect_vertex_buffer, d3dobj.rect_instance_buffer}
+	vertex_strides := []u32{size_of(Rect_Vertex), size_of(Rect_Instance)}
+	vertex_offsets := []u32{0, 0}
+	d3dobj.ctx->IASetVertexBuffers(0, 2, raw_data(vertex_buffers), raw_data(vertex_strides), raw_data(vertex_offsets))
+	d3dobj.ctx->IASetIndexBuffer(d3dobj.rect_index_buffer, .R16_UINT, 0)
+	d3dobj.ctx->IASetInputLayout(d3dobj.rect_input_layout)
+	d3dobj.ctx->VSSetShader(d3dobj.rect_vertex_shader, nil, 0)
+	d3dobj.ctx->PSSetShader(d3dobj.rect_pixel_shader, nil, 0)
+	d3dobj.ctx->IASetPrimitiveTopology(.TRIANGLELIST)
+	viewport: d3d11.VIEWPORT
+	viewport.Width = f32(platform_size.x)
+	viewport.Height = f32(platform_size.y)
+	viewport.MaxDepth = 1.0
+	d3dobj.ctx->RSSetViewports(1, &viewport)
+
+	d3dobj.ctx->DrawIndexedInstanced(u32(len(rect_indices)), u32(len(rect_instances)), 0, 0, 0)
 
 	d3dobj.ctx->ResolveSubresource(d3dobj.swapchain_backbuffer, 0, d3dobj.backbuffer, 0, .R16G16B16A16_FLOAT)
 	d3dobj.swapchain->Present(1, {})
