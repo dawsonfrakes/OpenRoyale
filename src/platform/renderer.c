@@ -23,7 +23,8 @@ void renderer_switch_api(int new_api);
 Platform_Renderer* platform_renderer;
 
 void renderer_switch_api(int new_api) {
-	if (platform_renderer) platform_renderer->deinit();
+	bool was_set_before = platform_renderer != null;
+	if (was_set_before) platform_renderer->deinit();
 	switch (new_api) {
 #if RENDER_APIS & RENDER_API_NONE
 		case RENDER_API_NONE: platform_renderer = &renderer_none; break;
@@ -34,4 +35,5 @@ void renderer_switch_api(int new_api) {
 		default: unreachable;
 	}
 	platform_renderer->init();
+	if (was_set_before) platform_renderer->resize();
 }
