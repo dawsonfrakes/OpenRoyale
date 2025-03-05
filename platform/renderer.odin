@@ -37,7 +37,9 @@ platform_renderers := [Render_API]^Renderer{
 
 renderer_switch_api :: proc(new_api: Render_API) {
 	assert(new_api in platform_render_apis)
-	if platform_renderer != nil do platform_renderer.deinit()
+	previous_exists := platform_renderer != nil
+	if previous_exists do platform_renderer.deinit()
 	platform_renderer = platform_renderers[new_api]
 	platform_renderer.init()
+	if previous_exists do platform_renderer.resize()
 }
