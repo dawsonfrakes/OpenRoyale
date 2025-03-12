@@ -24,7 +24,6 @@ nil_renderer := Renderer{
 	present = proc() {},
 	procs = {
 		clear_color = proc(color: [4]f32, index: u32) {},
-		clear_depth = proc(depth: f32) {},
 	},
 }
 
@@ -36,7 +35,7 @@ renderer_switch_api :: proc(new_api: Render_API) {
 			platform_renderer = &nil_renderer
 		case .D3D11:
 			assert(ODIN_OS == .Windows)
-			platform_renderer = &d3d11_renderer when ODIN_OS == .Windows else nil_renderer
+			platform_renderer = &d3d11_renderer when ODIN_OS == .Windows else &nil_renderer
 	}
 	platform_renderer.init()
 	if was_set_before do platform_renderer.resize()

@@ -8,6 +8,7 @@ d3dobj: struct {
 	device: ^d3d11.IDevice,
 	swapchain: ^dxgi.ISwapChain,
 	ctx: ^d3d11.IDeviceContext,
+	color0: [4]f32,
 }
 
 d3d11_renderer := Renderer{
@@ -63,13 +64,29 @@ d3d11_renderer := Renderer{
 			backbuffer: ^d3d11.ITexture2D
 			hr = d3dobj.swapchain->GetBuffer(0, d3d11.ITexture2D_UUID, cast(^rawptr) &backbuffer)
 			if w.FAILED(hr) do break error
+			defer backbuffer->Release()
 
 			backbuffer_view: ^d3d11.IRenderTargetView
 			hr = d3dobj.device->CreateRenderTargetView(backbuffer, nil, &backbuffer_view)
 			if w.FAILED(hr) do break error
 			defer backbuffer_view->Release()
 
-			d3dobj.ctx->ClearRenderTargetView(backbuffer_view, &{0.6, 0.2, 0.2, 1.0})
+			d3dobj.ctx->ClearRenderTargetView(backbuffer_view, &d3dobj.color0)
+
+			d3dobj.ctx->IASetPrimitiveTopology(.TRIANGLELIST)
+			// d3dobj.ctx->IASetIndexBuffer(rect_index_buffer, .R16_UINT, 0)
+			// d3dobj.ctx->IASetVertexBuffers(0, 1, &rect_vertex_buffer, raw_data([]u32{size_of(Rect_Vertex)}), raw_data([]u32{0}))
+
+			// d3dobj.ctx->VSSetShader(rect_vertex_shader, nil, 0)
+			// d3dobj.ctx->PSSetShader(rect_pixel_shader, nil, 0)
+
+			viewport: d3d11.VIEWPORT
+			viewport.MaxDepth = 1.0
+			viewport.Width = f32(platform_size.x)
+			viewport.Height = f32(platform_size.y)
+			d3dobj.ctx->RSSetViewports(1, &viewport)
+
+			d3dobj.ctx->DrawIndexedInstanced(3, 1, 0, 0, 0)
 
 			hr = d3dobj.swapchain->Present(1, {})
 			if w.FAILED(hr) do break error
@@ -79,7 +96,9 @@ d3d11_renderer := Renderer{
 		renderer_switch_api(.NONE)
 	},
 	procs = {
-		clear_color = proc(color: [4]f32, index: u32) {},
-		clear_depth = proc(depth: f32) {},
+		clear_color = proc(color: [4]f32, index: u32) {
+			assert(index == 0)
+			d3dobj.color0 = color
+		},
 	},
 }

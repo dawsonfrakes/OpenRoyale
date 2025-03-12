@@ -5,8 +5,7 @@ Input :: struct {
 }
 
 Renderer_Procs :: struct {
-		clear_color: proc(color: [4]f32, index: u32 = 0),
-		clear_depth: proc(depth: f32),
+	clear_color: proc(color: [4]f32, index: u32 = 0),
 }
 
 Renderer :: struct {
