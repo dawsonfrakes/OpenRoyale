@@ -1,0 +1,11 @@
+(using (import "Windows"))
+
+(: platform_hinstance HINSTANCE)
+
+(proc WinMainCRTStartup () noreturn #callconv WINAPI
+ (= platform_hinstance (GetModuleHandleW null))
+
+ (SetProcessDPIAware)
+
+ (ExitProcess 0)
+)
