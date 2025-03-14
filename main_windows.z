@@ -1,4 +1,4 @@
-(using (import "Windows"))
+(using (import "windows.z"))
 
 (: platform_hinstance HINSTANCE)
 
