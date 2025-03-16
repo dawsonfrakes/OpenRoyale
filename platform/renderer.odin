@@ -21,7 +21,8 @@ nil_renderer := Renderer{
 	resize = proc() {},
 	present = proc() {},
 	procs = {
-		clear_color = proc(color: [4]f32, index: u32 = 0) {}
+		clear_color = proc(color: [4]f32, index: u32 = 0) {},
+		rect = proc(position: [2]f32, size: [2]f32, color: [4]f32, texcoords: [2][2]f32, texture: game.Rect_Texture, rotation: f32, z_index: i32) {},
 	},
 }
 
